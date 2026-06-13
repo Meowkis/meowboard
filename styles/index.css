@@ -71,6 +71,10 @@ main {
     cursor: grabbing;
 }
 
+.card.inertia {
+    animation-play-state: paused;
+}
+
 .card.dragging {
     animation-play-state: paused;
     scale: 1.05;
