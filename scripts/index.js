@@ -285,7 +285,7 @@ cards.forEach((card) => {
 
     card.addEventListener("pointerdown", function (e) {
         const interactiveMedia = e.target.closest(
-            "video, audio, button, input, textarea, select, a"
+            "video, iframe, audio, button, input, textarea, select, a"
         );
 
         if (interactiveMedia) {
