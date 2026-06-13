@@ -15,9 +15,13 @@ const main = document.querySelector("main");
 const cards = document.querySelectorAll(".card");
 
 const linksLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-
 linksLayer.classList.add("links-layer");
 main.prepend(linksLayer);
+
+const starLinksLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+starLinksLayer.classList.add("star-links-layer");
+main.append(starLinksLayer);
+
 
 const activeLinks = [];
 
@@ -58,6 +62,54 @@ function randomCardSetup(card) {
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(value, max));
+}
+
+function moveCardToCenter(card, centerX, centerY) {
+    if (card.inertiaAnimationId) {
+        cancelAnimationFrame(card.inertiaAnimationId);
+        card.inertiaAnimationId = null;
+    }
+
+    card.classList.remove("dragging");
+    card.classList.add("forming-star");
+
+    card.style.zIndex = ++maxZIndex;
+
+    const x = centerX - card.offsetWidth / 2;
+    const y = centerY - card.offsetHeight / 2;
+
+    card.style.left = `${x}px`;
+    card.style.top = `${y}px`;
+}
+
+function getAdaptiveStarPoints(selectedCards) {
+    const mainRect = main.getBoundingClientRect();
+
+    const padding = Math.max(16, Math.min(mainRect.width, mainRect.height) * 0.04);
+
+    const maxCardWidth = Math.max(...selectedCards.map((card) => card.offsetWidth));
+    const maxCardHeight = Math.max(...selectedCards.map((card) => card.offsetHeight));
+
+    const centerX = mainRect.width / 2;
+    const centerY = mainRect.height / 2;
+
+    const radiusX = mainRect.width / 2 - maxCardWidth / 2 - padding;
+    const radiusY = mainRect.height / 2 - maxCardHeight / 2 - padding;
+
+    const radius = Math.max(40, Math.min(radiusX, radiusY));
+
+    const points = [];
+
+    for (let i = 0; i < 5; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI * 2 / 5;
+
+        points.push({
+            x: centerX + Math.cos(angle) * radius,
+            y: centerY + Math.sin(angle) * radius
+        });
+    }
+
+    return points;
 }
 
 function startInertia(card, velocityX, velocityY) {
@@ -244,6 +296,119 @@ function getCardCenter(card) {
     };
 }
 
+function createCustomLinkBetween(cardA, cardB, options = {}) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+
+    line.classList.add("link-line");
+
+    if (options.className) {
+        line.classList.add(options.className);
+    }
+
+    const layer = options.layer ?? linksLayer;
+
+    layer.appendChild(line);
+
+    const link = {
+        line,
+        cardA,
+        cardB
+    };
+
+    activeLinks.push(link);
+
+    updateSingleLink(link);
+
+    const visibleTime = options.visibleTime ?? 1800;
+    const fadeTime = options.fadeTime ?? 1200;
+
+    setTimeout(() => {
+        line.classList.add("fading");
+
+        setTimeout(() => {
+            line.remove();
+
+            const index = activeLinks.indexOf(link);
+
+            if (index !== -1) {
+                activeLinks.splice(index, 1);
+            }
+        }, fadeTime);
+    }, visibleTime);
+}
+
+function getRandomCards(count) {
+    const cardsArray = Array.from(cards);
+    const shuffledCards = cardsArray.sort(() => Math.random() - 0.5);
+
+    return shuffledCards.slice(0, count);
+}
+
+function getCardCenterPoint(card) {
+    const center = getCardCenter(card);
+
+    return {
+        card,
+        x: center.x,
+        y: center.y
+    };
+}
+
+function sortCardsAroundCenter(selectedCards) {
+    const points = selectedCards.map(getCardCenterPoint);
+
+    const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+    const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+
+    return points
+        .sort((pointA, pointB) => {
+            const angleA = Math.atan2(pointA.y - centerY, pointA.x - centerX);
+            const angleB = Math.atan2(pointB.y - centerY, pointB.x - centerX);
+
+            return angleA - angleB;
+        })
+        .map((point) => point.card);
+}
+
+function createStarBetweenCards() {
+    if (cards.length < 5) {
+        return;
+    }
+
+    const selectedCards = getRandomCards(5);
+    const starPoints = getAdaptiveStarPoints(selectedCards);
+
+    const starOrder = [0, 2, 4, 1, 3, 0];
+
+    const visibleTime = 2600;
+    const fadeTime = 1400;
+    const moveTime = 750;
+
+    selectedCards.forEach((card, index) => {
+        moveCardToCenter(card, starPoints[index].x, starPoints[index].y);
+    });
+
+    setTimeout(() => {
+        for (let i = 0; i < starOrder.length - 1; i++) {
+            const cardA = selectedCards[starOrder[i]];
+            const cardB = selectedCards[starOrder[i + 1]];
+
+            createCustomLinkBetween(cardA, cardB, {
+                className: "star-line",
+                visibleTime,
+                fadeTime,
+                layer: starLinksLayer
+            });
+        }
+    }, moveTime);
+
+    setTimeout(() => {
+        selectedCards.forEach((card) => {
+            card.classList.remove("forming-star");
+        });
+    }, moveTime + visibleTime + fadeTime);
+}
+
 function createLinkBetween(cardA, cardB) {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
 
@@ -320,3 +485,7 @@ function scheduleRandomLinks() {
 
 updateLinks();
 scheduleRandomLinks();
+
+h1Node.addEventListener("click", function () {
+    createStarBetweenCards();
+});
