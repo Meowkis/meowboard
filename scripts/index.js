@@ -26,6 +26,7 @@ main.append(starLinksLayer);
 const activeLinks = [];
 
 let maxZIndex = 1;
+let starAnimationToken = 0;
 
 function random(min, max) {
     return Math.random() * (max - min) + min;
@@ -73,25 +74,6 @@ function getCardCenter(card) {
     };
 }
 
-function moveCardToCenter(card, centerX, centerY) {
-    if (card.inertiaAnimationId) {
-        cancelAnimationFrame(card.inertiaAnimationId);
-        card.inertiaAnimationId = null;
-    }
-
-    card.classList.remove("dragging");
-    card.classList.remove("inertia");
-    card.classList.add("forming-star");
-
-    card.style.zIndex = ++maxZIndex;
-
-    const x = centerX - card.offsetWidth / 2;
-    const y = centerY - card.offsetHeight / 2;
-
-    card.style.left = `${x}px`;
-    card.style.top = `${y}px`;
-}
-
 function getAdaptiveStarPoints(selectedCards) {
     const mainRect = main.getBoundingClientRect();
 
@@ -122,7 +104,93 @@ function getAdaptiveStarPoints(selectedCards) {
     return points;
 }
 
-function startInertia(card, velocityX, velocityY) {
+function prepareCardForStarFlight(card) {
+    if (card.inertiaAnimationId) {
+        cancelAnimationFrame(card.inertiaAnimationId);
+        card.inertiaAnimationId = null;
+    }
+
+    const mainRect = main.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+
+    const currentX = cardRect.left - mainRect.left;
+    const currentY = cardRect.top - mainRect.top;
+
+    card.style.transition = "none";
+    card.style.left = `${currentX}px`;
+    card.style.top = `${currentY}px`;
+    card.style.transform = "none";
+    card.style.animationPlayState = "paused";
+
+    card.classList.remove("dragging");
+    card.classList.remove("inertia");
+    card.classList.add("forming-star");
+
+    card.style.zIndex = ++maxZIndex;
+
+    card.offsetHeight;
+}
+
+function flyCardToStarPoint(card, centerX, centerY, moveTime) {
+    prepareCardForStarFlight(card);
+
+    const mainRect = main.getBoundingClientRect();
+
+    const currentCenter = getCardCenter(card);
+
+    let directionX = centerX - currentCenter.x;
+    let directionY = centerY - currentCenter.y;
+
+    let distance = Math.hypot(directionX, directionY);
+
+    if (distance < 1) {
+        directionX = centerX - mainRect.width / 2;
+        directionY = centerY - mainRect.height / 2;
+        distance = Math.hypot(directionX, directionY);
+    }
+
+    if (distance < 1) {
+        const angle = random(0, Math.PI * 2);
+
+        directionX = Math.cos(angle);
+        directionY = Math.sin(angle);
+        distance = 1;
+    }
+
+    const normalizedX = directionX / distance;
+    const normalizedY = directionY / distance;
+
+    const targetX = centerX - card.offsetWidth / 2;
+    const targetY = centerY - card.offsetHeight / 2;
+
+    const inertiaSpeed = 1.25;
+
+    const velocityX = normalizedX * inertiaSpeed;
+    const velocityY = normalizedY * inertiaSpeed;
+
+    card.style.transition = `
+        left ${moveTime}ms linear,
+        top ${moveTime}ms linear,
+        scale 0.25s ease,
+        box-shadow 0.25s ease
+    `;
+
+    requestAnimationFrame(() => {
+        card.style.left = `${targetX}px`;
+        card.style.top = `${targetY}px`;
+    });
+
+    return {
+        card,
+        velocityX,
+        velocityY
+    };
+}
+
+function startInertia(card, velocityX, velocityY, options = {}) {
+    card.style.transition = "";
+
+    card.classList.remove("forming-star");
     card.classList.add("inertia");
 
     let x = parseFloat(card.style.left) || 0;
@@ -133,7 +201,7 @@ function startInertia(card, velocityX, velocityY) {
     const friction = 0.94;
     const bounce = 0.35;
     const minSpeed = 0.02;
-    const maxSpeed = 1.8;
+    const maxSpeed = 0.3;
 
     const speed = Math.hypot(velocityX, velocityY);
 
@@ -187,6 +255,12 @@ function startInertia(card, velocityX, velocityY) {
         if (Math.abs(velocityX) < minSpeed && Math.abs(velocityY) < minSpeed) {
             card.classList.remove("inertia");
             card.inertiaAnimationId = null;
+
+            if (options.restoreFloat) {
+                card.style.transform = "";
+                card.style.animationPlayState = "";
+            }
+
             return;
         }
 
@@ -223,9 +297,17 @@ cards.forEach((card) => {
             card.inertiaAnimationId = null;
         }
 
-        card.classList.remove("inertia");
-
+        const mainRect = main.getBoundingClientRect();
         const cardRect = card.getBoundingClientRect();
+
+        card.style.transition = "none";
+        card.style.left = `${cardRect.left - mainRect.left}px`;
+        card.style.top = `${cardRect.top - mainRect.top}px`;
+        card.style.transform = "";
+        card.style.animationPlayState = "";
+
+        card.classList.remove("inertia");
+        card.classList.remove("forming-star");
 
         shiftX = e.clientX - cardRect.left;
         shiftY = e.clientY - cardRect.top;
@@ -366,6 +448,8 @@ function createStarBetweenCards() {
         return;
     }
 
+    const currentToken = ++starAnimationToken;
+
     const selectedCards = getRandomCards(5);
     const starPoints = getAdaptiveStarPoints(selectedCards);
 
@@ -375,11 +459,20 @@ function createStarBetweenCards() {
     const fadeTime = 1400;
     const moveTime = 750;
 
-    selectedCards.forEach((card, index) => {
-        moveCardToCenter(card, starPoints[index].x, starPoints[index].y);
+    const starFlights = selectedCards.map((card, index) => {
+        return flyCardToStarPoint(
+            card,
+            starPoints[index].x,
+            starPoints[index].y,
+            moveTime
+        );
     });
 
     setTimeout(() => {
+        if (currentToken !== starAnimationToken) {
+            return;
+        }
+
         for (let i = 0; i < starOrder.length - 1; i++) {
             const cardA = selectedCards[starOrder[i]];
             const cardB = selectedCards[starOrder[i + 1]];
@@ -391,13 +484,13 @@ function createStarBetweenCards() {
                 layer: starLinksLayer
             });
         }
-    }, moveTime);
 
-    setTimeout(() => {
-        selectedCards.forEach((card) => {
-            card.classList.remove("forming-star");
+        starFlights.forEach((flight) => {
+            startInertia(flight.card, flight.velocityX, flight.velocityY, {
+                restoreFloat: true
+            });
         });
-    }, moveTime + visibleTime + fadeTime);
+    }, moveTime);
 }
 
 function updateSingleLink(link) {
