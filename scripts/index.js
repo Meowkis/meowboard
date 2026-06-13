@@ -1,14 +1,15 @@
 let h1Node = document.querySelector("h1");
 
-h1Node.addEventListener("mouseenter", function(e) {
+h1Node.addEventListener("mouseenter", function (e) {
     let a = Math.random() * 10 - 5;
+
     h1Node.style.transform = "rotate(" + a + "deg) scale(1.1)";
-    h1Node.innerText = "Welcome to Meowboard ^_^"
+    h1Node.innerText = "Welcome to Meowboard ^_^";
 });
 
-h1Node.addEventListener("mouseleave", function(e) {
+h1Node.addEventListener("mouseleave", function (e) {
     h1Node.style.transform = "rotate(0deg) scale(1)";
-    h1Node.innerText = "Welcome to Meowboard :3"
+    h1Node.innerText = "Welcome to Meowboard :3";
 });
 
 const main = document.querySelector("main");
@@ -22,14 +23,16 @@ const starLinksLayer = document.createElementNS("http://www.w3.org/2000/svg", "s
 starLinksLayer.classList.add("star-links-layer");
 main.append(starLinksLayer);
 
-
 const activeLinks = [];
-
 
 let maxZIndex = 1;
 
 function random(min, max) {
     return Math.random() * (max - min) + min;
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(value, max));
 }
 
 function randomCardSetup(card) {
@@ -60,8 +63,14 @@ function randomCardSetup(card) {
     card.style.animationDelay = `${random(0, 2)}s`;
 }
 
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(value, max));
+function getCardCenter(card) {
+    const mainRect = main.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+
+    return {
+        x: cardRect.left - mainRect.left + cardRect.width / 2,
+        y: cardRect.top - mainRect.top + cardRect.height / 2
+    };
 }
 
 function moveCardToCenter(card, centerX, centerY) {
@@ -71,6 +80,7 @@ function moveCardToCenter(card, centerX, centerY) {
     }
 
     card.classList.remove("dragging");
+    card.classList.remove("inertia");
     card.classList.add("forming-star");
 
     card.style.zIndex = ++maxZIndex;
@@ -185,6 +195,7 @@ function startInertia(card, velocityX, velocityY) {
 
     card.inertiaAnimationId = requestAnimationFrame(animate);
 }
+
 cards.forEach((card) => {
     randomCardSetup(card);
 
@@ -285,17 +296,6 @@ cards.forEach((card) => {
     });
 });
 
-
-function getCardCenter(card) {
-    const mainRect = main.getBoundingClientRect();
-    const cardRect = card.getBoundingClientRect();
-
-    return {
-        x: cardRect.left - mainRect.left + cardRect.width / 2,
-        y: cardRect.top - mainRect.top + cardRect.height / 2
-    };
-}
-
 function createCustomLinkBetween(cardA, cardB, options = {}) {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
 
@@ -303,6 +303,10 @@ function createCustomLinkBetween(cardA, cardB, options = {}) {
 
     if (options.className) {
         line.classList.add(options.className);
+    }
+
+    if (options.fadeTime) {
+        line.style.transitionDuration = `${options.fadeTime}ms`;
     }
 
     const layer = options.layer ?? linksLayer;
@@ -337,37 +341,24 @@ function createCustomLinkBetween(cardA, cardB, options = {}) {
     }, visibleTime);
 }
 
+function createLinkBetween(cardA, cardB) {
+    createCustomLinkBetween(cardA, cardB, {
+        visibleTime: random(300, 1400),
+        fadeTime: 1200,
+        layer: linksLayer
+    });
+}
+
 function getRandomCards(count) {
     const cardsArray = Array.from(cards);
-    const shuffledCards = cardsArray.sort(() => Math.random() - 0.5);
 
-    return shuffledCards.slice(0, count);
-}
+    for (let i = cardsArray.length - 1; i > 0; i--) {
+        const j = Math.floor(random(0, i + 1));
 
-function getCardCenterPoint(card) {
-    const center = getCardCenter(card);
+        [cardsArray[i], cardsArray[j]] = [cardsArray[j], cardsArray[i]];
+    }
 
-    return {
-        card,
-        x: center.x,
-        y: center.y
-    };
-}
-
-function sortCardsAroundCenter(selectedCards) {
-    const points = selectedCards.map(getCardCenterPoint);
-
-    const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
-    const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-
-    return points
-        .sort((pointA, pointB) => {
-            const angleA = Math.atan2(pointA.y - centerY, pointA.x - centerX);
-            const angleB = Math.atan2(pointB.y - centerY, pointB.x - centerX);
-
-            return angleA - angleB;
-        })
-        .map((point) => point.card);
+    return cardsArray.slice(0, count);
 }
 
 function createStarBetweenCards() {
@@ -409,41 +400,6 @@ function createStarBetweenCards() {
     }, moveTime + visibleTime + fadeTime);
 }
 
-function createLinkBetween(cardA, cardB) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-
-    line.classList.add("link-line");
-
-    linksLayer.appendChild(line);
-
-    const link = {
-        line,
-        cardA,
-        cardB
-    };
-
-    activeLinks.push(link);
-
-    updateSingleLink(link);
-
-    const visibleTime = random(300, 1400);
-    const fadeTime = 1200;
-
-    setTimeout(() => {
-        line.classList.add("fading");
-
-        setTimeout(() => {
-            line.remove();
-
-            const index = activeLinks.indexOf(link);
-
-            if (index !== -1) {
-                activeLinks.splice(index, 1);
-            }
-        }, fadeTime);
-    }, visibleTime);
-}
-
 function updateSingleLink(link) {
     const pointA = getCardCenter(link.cardA);
     const pointB = getCardCenter(link.cardB);
@@ -475,7 +431,7 @@ function createRandomLink() {
 }
 
 function scheduleRandomLinks() {
-    const delay = random(500, 2500);
+    const delay = random(100, 200);
 
     setTimeout(() => {
         createRandomLink();
