@@ -181,6 +181,11 @@ main {
     padding: 16px;
     text-align: center;
     flex-direction: column;
+
+    aspect-ratio: auto;
+    min-height: 190px;
+    padding: 18px;
+    overflow: hidden;
 }
 
 .quote-placeholder blockquote {
@@ -210,4 +215,33 @@ main {
 
 .youtube-placeholder iframe {
     object-fit: initial;
+}
+
+
+.audio-placeholder {
+    aspect-ratio: auto;
+    min-height: 220px;
+    padding: 12px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    align-items: center;
+    justify-content: center;
+}
+
+.audio-cover {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+
+    object-fit: cover;
+    border-radius: 10px;
+
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.audio-placeholder audio {
+    width: 100%;
 }

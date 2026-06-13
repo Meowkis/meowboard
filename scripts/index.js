@@ -15,6 +15,8 @@ h1Node.addEventListener("mouseleave", function (e) {
 const main = document.querySelector("main");
 const cards = document.querySelectorAll(".card");
 
+
+
 const linksLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 linksLayer.classList.add("links-layer");
 main.prepend(linksLayer);
@@ -37,14 +39,22 @@ function clamp(value, min, max) {
 }
 
 function randomCardSetup(card) {
-    const size = random(140, 260);
+    const isQuoteCard = card.querySelector(".quote-placeholder");
+
+    const minSize = isQuoteCard ? 240 : 140;
+    const maxSize = isQuoteCard ? 360 : 260;
+
+    const size = random(minSize, maxSize);
 
     card.style.width = `${size}px`;
 
     const mainRect = main.getBoundingClientRect();
 
-    const maxX = mainRect.width - size;
-    const maxY = mainRect.height - size - 70;
+    const cardWidth = card.offsetWidth;
+    const cardHeight = card.offsetHeight;
+
+    const maxX = mainRect.width - cardWidth;
+    const maxY = mainRect.height - cardHeight;
 
     const x = random(0, Math.max(0, maxX));
     const y = random(0, Math.max(0, maxY));
@@ -63,7 +73,6 @@ function randomCardSetup(card) {
     card.style.animationDuration = `${random(2.5, 5)}s`;
     card.style.animationDelay = `${random(0, 2)}s`;
 }
-
 function getCardCenter(card) {
     const mainRect = main.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
